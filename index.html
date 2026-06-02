@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>眨眼挑战 👁️</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+      background: #0f0c29;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      margin-bottom: 6px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 20px rgba(100,200,255,0.6);
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: #a0aec0;
+      margin-bottom: 28px;
+    }
+
+    /* ── Main card ── */
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 24px;
+      padding: 32px 40px;
+      width: 520px;
+      max-width: 96vw;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    /* ── Video + canvas overlay ── */
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+      background: #000;
+    }
+
+    video, canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    video { transform: scaleX(-1); }
+    canvas { transform: scaleX(-1); pointer-events: none; }
+
+    /* ── HUD overlay inside video ── */
+    .hud {
+      position: absolute;
+      top: 12px; left: 12px;
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .hud-pill {
+      background: rgba(0,0,0,0.55);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    #hud-timer { color: #ffd166; }
+    #hud-blinks { color: #06d6a0; }
+
+    /* ── Status badge ── */
+    .status-badge {
+      position: absolute;
+      bottom: 12px; right: 12px;
+      background: rgba(0,0,0,0.55);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      z-index: 10;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .dot.green { background: #06d6a0; box-shadow: 0 0 6px #06d6a0; animation: pulse 1.2s infinite; }
+    .dot.yellow { background: #ffd166; }
+    .dot.red { background: #ef4444; }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .stat-box {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 14px 10px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .stat-box .val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .stat-box .lbl {
+      font-size: 0.75rem;
+      color: #a0aec0;
+      margin-top: 4px;
+    }
+
+    #stat-blinks .val { color: #06d6a0; }
+    #stat-timer .val { color: #ffd166; }
+    #stat-rate .val { color: #a78bfa; }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    #progress-bar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #06d6a0, #118ab2);
+      border-radius: 99px;
+      transition: width 0.3s linear, background 0.5s;
+    }
+
+    /* ── Buttons ── */
+    .btn-row { display: flex; gap: 12px; }
+
+    button {
+      padding: 12px 32px;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+
+    button:active { transform: scale(0.96); }
+
+    #btn-start {
+      background: linear-gradient(135deg, #06d6a0, #118ab2);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(6,214,160,0.4);
+    }
+
+    #btn-start:hover { box-shadow: 0 0 30px rgba(6,214,160,0.6); }
+    #btn-start:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #btn-reset {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    #btn-reset:hover { background: rgba(255,255,255,0.18); }
+
+    /* ── Result modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px;
+      padding: 40px 48px;
+      text-align: center;
+      max-width: 380px;
+      width: 90vw;
+      animation: popIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-emoji { font-size: 4rem; margin-bottom: 12px; display: block; }
+    .modal-title { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; }
+    .modal-score { font-size: 4rem; font-weight: 900; color: #06d6a0; line-height: 1; margin: 12px 0; }
+    .modal-unit { font-size: 1rem; color: #a0aec0; margin-bottom: 4px; }
+    .modal-rate { font-size: 1rem; color: #a78bfa; margin-bottom: 20px; }
+    .modal-rank { font-size: 1rem; color: #ffd166; margin-bottom: 24px; background: rgba(255,209,102,0.1); border-radius: 10px; padding: 8px 16px; }
+
+    .modal button {
+      width: 100%;
+      background: linear-gradient(135deg, #06d6a0, #118ab2);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(6,214,160,0.35);
+    }
+
+    /* ── Tip ── */
+    .tip {
+      font-size: 0.82rem;
+      color: #718096;
+      text-align: center;
+      max-width: 360px;
+    }
+
+    /* ── Eye indicator ring ── */
+    .eye-ring {
+      position: absolute;
+      top: 12px; right: 12px;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.2);
+      z-index: 10;
+      transition: border-color 0.1s, box-shadow 0.1s;
+    }
+
+    .eye-ring.open { border-color: #06d6a0; box-shadow: 0 0 10px #06d6a0; }
+    .eye-ring.closed { border-color: #ffd166; box-shadow: 0 0 10px #ffd166; }
+  </style>
+</head>
+<body>
+
+<h1>👁️ 眨眼挑战</h1>
+<p class="subtitle">20 秒内眨尽可能多的眼睛，挑战极限！</p>
+
+<div class="card">
+  <!-- Video -->
+  <div class="video-wrap">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay"></canvas>
+
+    <div class="hud">
+      <div class="hud-pill" id="hud-timer">⏱ 20.0s</div>
+      <div class="hud-pill" id="hud-blinks">👁 0 次</div>
+    </div>
+
+    <div class="eye-ring" id="eye-ring"></div>
+
+    <div class="status-badge" id="status-badge">
+      <span class="dot yellow" id="status-dot"></span>
+      <span id="status-text">初始化中…</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-box" id="stat-blinks">
+      <div class="val" id="val-blinks">0</div>
+      <div class="lbl">眨眼次数</div>
+    </div>
+    <div class="stat-box" id="stat-timer">
+      <div class="val" id="val-timer">20</div>
+      <div class="lbl">剩余秒数</div>
+    </div>
+    <div class="stat-box" id="stat-rate">
+      <div class="val" id="val-rate">—</div>
+      <div class="lbl">每分钟频率</div>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap">
+    <div id="progress-bar"></div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button id="btn-start" disabled>🚀 开始挑战</button>
+    <button id="btn-reset">🔄 重置</button>
+  </div>
+
+  <p class="tip">请确保面部在摄像头画面正中，光线充足。检测基于眼部纵横比（EAR）算法。</p>
+</div>
+
+<!-- Result Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <span class="modal-emoji" id="modal-emoji">🎉</span>
+    <div class="modal-title" id="modal-title">挑战完成！</div>
+    <div class="modal-score" id="modal-score">0</div>
+    <div class="modal-unit">次眨眼 / 20 秒</div>
+    <div class="modal-rate" id="modal-rate">每分钟 — 次</div>
+    <div class="modal-rank" id="modal-rank"></div>
+    <button onclick="closeModal()">再来一次 🔄</button>
+  </div>
+</div>
+
+<!-- MediaPipe via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+<script>
+// ─── MediaPipe landmark indices for eyes ───────────────────────────────────
+// Left eye  (from viewer's left, mirror image): 362,385,387,263,373,380
+// Right eye (from viewer's right):              33, 160,158, 133,153,144
+const LEFT_EYE  = [362, 385, 387, 263, 373, 380];
+const RIGHT_EYE = [ 33, 160, 158, 133, 153, 144];
+
+// Eye Aspect Ratio threshold & consecutive frames
+const EAR_THRESHOLD   = 0.22;
+const CONSEC_FRAMES   = 2;    // frames eye must be closed to count as blink
+
+// ─── State ─────────────────────────────────────────────────────────────────
+let blinkCount        = 0;
+let consecFramesClosed = 0;
+let eyeClosed         = false;
+let gameActive        = false;
+let gameStartTime     = null;
+let timerInterval     = null;
+const GAME_DURATION   = 20000; // ms
+
+// DOM refs
+const video      = document.getElementById('video');
+const canvas     = document.getElementById('overlay');
+const ctx        = canvas.getContext('2d');
+const btnStart   = document.getElementById('btn-start');
+const btnReset   = document.getElementById('btn-reset');
+const statusDot  = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const hudTimer   = document.getElementById('hud-timer');
+const hudBlinks  = document.getElementById('hud-blinks');
+const valBlinks  = document.getElementById('val-blinks');
+const valTimer   = document.getElementById('val-timer');
+const valRate    = document.getElementById('val-rate');
+const progressBar= document.getElementById('progress-bar');
+const eyeRing    = document.getElementById('eye-ring');
+
+// ─── EAR calculation ───────────────────────────────────────────────────────
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function calcEAR(lm, indices) {
+  const [p1,p2,p3,p4,p5,p6] = indices.map(i => lm[i]);
+  const A = dist(p2, p6);
+  const B = dist(p3, p5);
+  const C = dist(p1, p4);
+  return (A + B) / (2.0 * C);
+}
+
+// ─── MediaPipe setup ───────────────────────────────────────────────────────
+const faceMesh = new FaceMesh({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`
+});
+
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
+
+faceMesh.onResults(onResults);
+
+// ─── Camera ────────────────────────────────────────────────────────────────
+const camera = new Camera(video, {
+  onFrame: async () => { await faceMesh.send({ image: video }); },
+  width: 640,
+  height: 480
+});
+
+camera.start().then(() => {
+  setStatus('green', '摄像头就绪');
+  btnStart.disabled = false;
+}).catch(err => {
+  setStatus('red', '摄像头错误');
+  statusText.textContent = '无法访问摄像头：' + err.message;
+});
+
+// ─── On each frame ─────────────────────────────────────────────────────────
+function onResults(results) {
+  // sync canvas size
+  canvas.width  = video.videoWidth  || video.offsetWidth;
+  canvas.height = video.videoHeight || video.offsetHeight;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+    if (gameActive) setStatus('yellow', '未检测到人脸');
+    return;
+  }
+
+  if (gameActive) setStatus('green', '检测中…');
+
+  const lm = results.multiFaceLandmarks[0];
+  const earL = calcEAR(lm, LEFT_EYE);
+  const earR = calcEAR(lm, RIGHT_EYE);
+  const ear  = (earL + earR) / 2;
+
+  // Draw subtle eye outlines
+  drawEyeContour(lm, LEFT_EYE,  ear < EAR_THRESHOLD ? '#ffd166' : '#06d6a0');
+  drawEyeContour(lm, RIGHT_EYE, ear < EAR_THRESHOLD ? '#ffd166' : '#06d6a0');
+
+  // Eye ring indicator
+  eyeRing.className = 'eye-ring ' + (ear < EAR_THRESHOLD ? 'closed' : 'open');
+
+  if (!gameActive) return;
+
+  // Blink detection
+  if (ear < EAR_THRESHOLD) {
+    consecFramesClosed++;
+  } else {
+    if (consecFramesClosed >= CONSEC_FRAMES) {
+      blinkCount++;
+      flashBlink();
+      updateStats();
+    }
+    consecFramesClosed = 0;
+  }
+}
+
+function drawEyeContour(lm, indices, color) {
+  const W = canvas.width, H = canvas.height;
+  ctx.beginPath();
+  indices.forEach((idx, i) => {
+    const pt = lm[idx];
+    // mirror x because canvas is also mirrored via CSS
+    const x = pt.x * W;
+    const y = pt.y * H;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+// ─── Game controls ─────────────────────────────────────────────────────────
+btnStart.addEventListener('click', startGame);
+btnReset.addEventListener('click', resetGame);
+
+function startGame() {
+  blinkCount = 0;
+  consecFramesClosed = 0;
+  gameActive = true;
+  gameStartTime = Date.now();
+  btnStart.disabled = true;
+  updateStats();
+
+  progressBar.style.background = 'linear-gradient(90deg, #06d6a0, #118ab2)';
+
+  timerInterval = setInterval(() => {
+    const elapsed = Date.now() - gameStartTime;
+    const remaining = Math.max(0, GAME_DURATION - elapsed);
+    const secs = remaining / 1000;
+
+    hudTimer.textContent  = `⏱ ${secs.toFixed(1)}s`;
+    valTimer.textContent  = Math.ceil(secs);
+    progressBar.style.width = (remaining / GAME_DURATION * 100) + '%';
+
+    if (remaining < 5000) {
+      progressBar.style.background = 'linear-gradient(90deg, #ef4444, #f97316)';
+    }
+
+    if (remaining <= 0) endGame();
+  }, 50);
+}
+
+function endGame() {
+  clearInterval(timerInterval);
+  gameActive = false;
+  hudTimer.textContent = '⏱ 0.0s';
+  valTimer.textContent = '0';
+  progressBar.style.width = '0%';
+  showResult();
+}
+
+function resetGame() {
+  clearInterval(timerInterval);
+  gameActive = false;
+  blinkCount = 0;
+  consecFramesClosed = 0;
+  btnStart.disabled = false;
+  hudTimer.textContent  = '⏱ 20.0s';
+  hudBlinks.textContent = '👁 0 次';
+  valBlinks.textContent = '0';
+  valTimer.textContent  = '20';
+  valRate.textContent   = '—';
+  progressBar.style.width = '100%';
+  progressBar.style.background = 'linear-gradient(90deg, #06d6a0, #118ab2)';
+}
+
+// ─── UI helpers ────────────────────────────────────────────────────────────
+function updateStats() {
+  hudBlinks.textContent = `👁 ${blinkCount} 次`;
+  valBlinks.textContent = blinkCount;
+
+  if (gameStartTime) {
+    const elapsed = (Date.now() - gameStartTime) / 1000;
+    if (elapsed > 1) {
+      const rate = Math.round(blinkCount / elapsed * 60);
+      valRate.textContent = rate;
+    }
+  }
+}
+
+function flashBlink() {
+  valBlinks.style.transform = 'scale(1.4)';
+  valBlinks.style.color = '#ffd166';
+  setTimeout(() => {
+    valBlinks.style.transform = 'scale(1)';
+    valBlinks.style.color = '';
+  }, 180);
+}
+
+function setStatus(color, text) {
+  statusDot.className = `dot ${color}`;
+  statusText.textContent = text;
+}
+
+// ─── Result modal ───────────────────────────────────────────────────────────
+function getRank(n) {
+  if (n >= 50) return ['🏆 传说级眨眼机器！', '🏆'];
+  if (n >= 40) return ['🥇 眨眼高手！', '🥇'];
+  if (n >= 30) return ['🥈 相当不错！', '🥈'];
+  if (n >= 20) return ['🥉 正常水平～', '🥉'];
+  if (n >= 10) return ['😅 有点慢哦，再试试？', '😅'];
+  return ['😴 是不是眼睛太累了？', '😴'];
+}
+
+function showResult() {
+  const rate = Math.round(blinkCount / 20 * 60);
+  const [rankText, emoji] = getRank(blinkCount);
+
+  document.getElementById('modal-emoji').textContent  = emoji;
+  document.getElementById('modal-score').textContent  = blinkCount;
+  document.getElementById('modal-rate').textContent   = `每分钟约 ${rate} 次`;
+  document.getElementById('modal-rank').textContent   = rankText;
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+  resetGame();
+}
+</script>
+</body>
+</html>
